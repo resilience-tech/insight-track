@@ -28,6 +28,10 @@ Welcome to InsightTrack, an advanced platform designed to monitor and enhance cu
 
 We welcome contributions to improve InsightTrack. Please refer to our [Contributing Guidelines](#) for more information.
 
+### Contributor License Agreement (CLA)
+
+All contributors must sign a [Contributor License Agreement (CLA)](.github/cla/CLA.md) before their pull requests can be merged. When you open a PR, a bot will prompt you to sign the CLA if you have not already done so. The "CLA" check must be green for your PR to be merged. Allowlisted bots (dependabot[bot], renovate[bot]) are exempt from signing.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](#) file for details.
