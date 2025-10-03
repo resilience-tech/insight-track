@@ -6,8 +6,10 @@ Welcome to InsightTrack, an advanced platform designed to monitor and enhance cu
 
 <img width="3072" height="1548" alt="image" src="https://github.com/user-attachments/assets/2ebb052f-dc85-4859-8de6-6674c624c6ca" />
 
+<img width="1303" height="654" alt="Screenshot 2025-09-26 at 19 58 32" src="https://github.com/user-attachments/assets/0c34579e-fe86-4a22-bd5d-1745cd198e44" />
 
 ## Key Features
+
 
 - **Real-Time Customer Insights**: Gain instant visibility into how customers interact with your product, from their first visit to ongoing usage.
 - **Stakeholder-Friendly Dashboards**: Designed with business stakeholders in mind, our dashboards present complex data in a simplified, easily understandable format.
@@ -27,6 +29,10 @@ Welcome to InsightTrack, an advanced platform designed to monitor and enhance cu
 ## Contributing
 
 We welcome contributions to improve InsightTrack. Please refer to our [Contributing Guidelines](#) for more information.
+
+### Contributor License Agreement (CLA)
+
+All contributors must sign a [Contributor License Agreement (CLA)](.github/cla/CLA.md) before their pull requests can be merged. When you open a PR, a bot will prompt you to sign the CLA if you have not already done so. The "CLA" check must be green for your PR to be merged. Allowlisted bots (dependabot[bot], renovate[bot]) are exempt from signing.
 
 ## License
 
