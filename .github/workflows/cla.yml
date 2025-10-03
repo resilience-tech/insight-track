@@ -1,0 +1,21 @@
+name: CLA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CLA signature
+        uses: contributor-assistant/github-action@v2
+        with:
+          path-to-document: '.github/cla/CLA.md'
+          path-to-signatures: '.github/cla/signatures/cla.json'
+          branch: 'main'
+          allowlist: 'dependabot[bot],renovate[bot]'
