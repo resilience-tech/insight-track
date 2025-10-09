@@ -1,12 +1,12 @@
 # Contributors
-- Akshaya
-- BangCodes 
-- Charan 
-- Haribabu
 - hemu
+- Charan 
+- Akshaya
+- Haribabu
 - Lavanya
 - Neelima
-- Rajini Panasa
-- Thanmai
-- VasanthiT
 - Vimala
+- VasanthiT
+- BangCodes 
+- Thanmai
+- Rajini Panasa
