@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 // The directory containing the components
 const componentsDir = '../src/charts'; // Change this to your components directory
 
-// Function to wrap component content with ChartContainer
+// Function to wrap component's content with ChartContainer
 const wrapWithChartContainer = (content) => {
   const importMetaUrlLine = `const filepath = new URL(import.meta.url).pathname;`;
 

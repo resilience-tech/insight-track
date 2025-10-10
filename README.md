@@ -2,7 +2,8 @@
 
 ## Overview
 
-Welcome to InsightTrack, an advanced platform designed to monitor and enhance customer experiences. Unlike traditional monitoring tools, InsightTrack focuses on the customer's perspective, providing actionable insights for product owners, business stakeholders, designers, and technical teams. This tool is ideal for small teams and growing businesses looking to optimize their time and communication while improving customer satisfaction.
+Welcome to InsightTrack, an advanced platform designed to monitor and enhance customer experiences. Unlike traditional monitoring tools, InsightTrack focuses on the customer’s perspective, providing actionable insights for product owners, business stakeholders, designers, and technical teams.
+This tool is ideal for small teams and growing businesses seeking to optimize their time and communication while enhancing customer satisfaction.
 
 <img width="3072" height="1548" alt="image" src="https://github.com/user-attachments/assets/2ebb052f-dc85-4859-8de6-6674c624c6ca" />
 
@@ -12,12 +13,12 @@ Welcome to InsightTrack, an advanced platform designed to monitor and enhance cu
 
 
 - **Real-Time Customer Insights**: Gain instant visibility into how customers interact with your product, from their first visit to ongoing usage.
-- **Stakeholder-Friendly Dashboards**: Designed with business stakeholders in mind, our dashboards present complex data in a simplified, easily understandable format.
-- **User Journey Tracking**: Follow the customer's journey through your product, identifying pain points and areas for improvement.
-- **Customizable Alerts**: Set up alerts for key metrics that matter to your business, ensuring you’re notified of issues before they impact the customer experience.
-- **Integration with Existing Tools**: Seamlessly integrate with your current toolset, including popular CRMs, support platforms, and development tools.
-- **Collaborative Workspaces**: Share insights and reports with your team, fostering a collaborative environment focused on customer-centric improvements.
-- **Detailed Reports**: Generate comprehensive reports that highlight trends, user behavior, and actionable insights.
+- **Stakeholder-Friendly Dashboards**: Designed with business stakeholders in mind, our dashboards present complex data in a simplified, easy-to-understand format.
+- **User Journey Tracking**: Follow the customer's journey through your product to identify pain points and areas for improvement.
+- **Customizable Alerts**: Set up alerts for key metrics that matter most to your business, ensuring you’re notified of issues before they impact the customer experience.
+- **Integration with Existing Tools**: Seamlessly integrate with your current toolset, including popular CRMs, support platforms and development tools.
+- **Collaborative Workspaces**: Share insights and reports with your team to foster a collaborative environment focused on customer-centric improvements.
+- **Detailed Reports**: Generate comprehensive reports that highlight trends, user behavior and actionable insights.
 
 ## Benefits
 
@@ -32,7 +33,7 @@ We welcome contributions to improve InsightTrack. Please refer to our [Contribut
 
 ### Contributor License Agreement (CLA)
 
-All contributors must sign a [Contributor License Agreement (CLA)](.github/cla/CLA.md) before their pull requests can be merged. When you open a PR, a bot will prompt you to sign the CLA if you have not already done so. The "CLA" check must be green for your PR to be merged. Allowlisted bots (dependabot[bot], renovate[bot]) are exempt from signing.
+All contributors must sign a [Contributor License Agreement (CLA)](.github/cla/CLA.md) before their pull requests can be merged. When you open a PR, a bot will prompt you to sign the CLA if you have not already done so. The "CLA" check must be green for your PR to be merged. Allowlisted bots (e.g, Dependabot [bot], Renovate[bot]) are exempt from signing.
 
 ## License
 
@@ -40,4 +41,4 @@ This project is licensed under the MIT License. See the [LICENSE](#) file for de
 
 ---
 
-Thank you for choosing InsightTrack. We are committed to helping you improve your customer experience and achieve your business goals.
+Thank you for choosing InsightTrack. We are dedicated to helping you enhance your customer experience and achieve your business objectives.
