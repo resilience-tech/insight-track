@@ -2,19 +2,18 @@
 - Neelima-vasanasetti
 - Vimala
 - VasanthiT
-- BangCodes 
+- BangCodes
 - Thanmai
 
 # Contributors
 - Akshaya
-- BangCodes 
-- Charan 
+- BangCodes
+- Charan
 - Haribabu
-- hemu
+- Hemu
 - Lavanya
 - Neelima
 - Rajini Panasa
 - Thanmai
 - VasanthiT
 - Vimala
-
