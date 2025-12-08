@@ -1,11 +1,5 @@
 # my-first-contribution
 - Neelima-vasanasetti
-- Vimala
-- VasanthiT
-- BangCodes
-- Thanmai
-
-# Contributors
 - Akshaya
 - BangCodes
 - Charan
