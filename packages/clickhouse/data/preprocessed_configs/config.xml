@@ -1,0 +1,82 @@
+<!-- This file was generated automatically.
+     Do not edit it: it is likely to be discarded and generated again before it's read next time.
+     Files used to generate this file:
+       /etc/clickhouse-server/config.xml
+       /etc/clickhouse-server/config.d/docker_related_config.xml      -->
+
+<!-- ClickHouse Configuration for HyperDX -->
+<clickhouse>
+    <!-- Network settings -->
+    <listen_host>::</listen_host>
+    
+    <!-- HTTP Interface -->
+    <http_port>8123</http_port>
+    
+    <!-- Native Protocol -->
+    <tcp_port>9000</tcp_port>
+    
+    <!-- Interserver HTTP port for replication -->
+    <interserver_http_port>9009</interserver_http_port>
+    
+    <!-- User settings -->
+    <users>
+        <default>
+            <password/>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+        </default>
+    </users>
+    
+    <!-- Profiles -->
+    <profiles>
+        <default>
+            <max_memory_usage>10000000000</max_memory_usage>
+            <use_uncompressed_cache>0</use_uncompressed_cache>
+            <load_balancing>random</load_balancing>
+        </default>
+    </profiles>
+    
+    <!-- Quotas -->
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+    
+    <!-- Logging -->
+    <logger>
+        <level>information</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+        <size>1000M</size>
+        <count>10</count>
+    </logger>
+    
+    <!-- Data compression -->
+    <compression>
+        <case>
+            <method>zstd</method>
+        </case>
+    </compression>
+
+     <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+    
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+
+    <!--
+    <logger>
+        <console>1</console>
+    </logger>
+    -->
+</clickhouse>

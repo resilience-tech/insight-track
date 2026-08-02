@@ -1,0 +1,5 @@
+columns format version: 1
+3 columns:
+`TraceId` String
+`Start` DateTime
+`End` DateTime

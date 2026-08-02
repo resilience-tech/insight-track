@@ -1,0 +1,25 @@
+columns format version: 1
+23 columns:
+`ResourceAttributes` Map(LowCardinality(String), String)
+`ResourceSchemaUrl` String
+`ScopeName` String
+`ScopeVersion` String
+`ScopeAttributes` Map(LowCardinality(String), String)
+`ScopeDroppedAttrCount` UInt32
+`ScopeSchemaUrl` String
+`ServiceName` LowCardinality(String)
+`MetricName` String
+`MetricDescription` String
+`MetricUnit` String
+`Attributes` Map(LowCardinality(String), String)
+`StartTimeUnix` DateTime64(9)
+`TimeUnix` DateTime64(9)
+`Value` Float64
+`Flags` UInt32
+`Exemplars.FilteredAttributes` Array(Map(LowCardinality(String), String))
+`Exemplars.TimeUnix` Array(DateTime64(9))
+`Exemplars.Value` Array(Float64)
+`Exemplars.SpanId` Array(String)
+`Exemplars.TraceId` Array(String)
+`AggregationTemporality` Int32
+`IsMonotonic` Bool
