@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.27.1
+          cache: false
+      - run: go mod download
+      - run: go mod verify
+      - run: go test -race ./...
+      - run: go vet ./...
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose config --quiet
+      - run: timeout 8m ./scripts/smoke.sh
+      - if: always()
+        run: docker compose logs --no-color api postgres keycloak
+      - if: always()
+        run: docker compose down --volumes

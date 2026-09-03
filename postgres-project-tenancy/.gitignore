@@ -1,0 +1,6 @@
+.env
+.DS_Store
+bin/
+coverage.out
+*.log
+project-tenancy

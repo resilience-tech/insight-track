@@ -1,0 +1,1374 @@
+openapi: 3.1.0
+info:
+  title: Project Tenancy API
+  version: 1.0.0
+  description: |
+    Project-scoped multi-tenant API. Project membership is the single shared
+    access level. Owners retain only lifecycle and sharing administration;
+    owners and shared members have identical service/resource CRUD access.
+servers:
+  - url: https://api.example.com/v1
+    description: Replace with the deployed API origin
+security:
+  - oidc:
+      - openid
+      - profile
+      - email
+tags:
+  - name: Identity
+  - name: Projects
+  - name: Sharing
+  - name: Services
+  - name: Resources
+  - name: Audit
+  - name: Health
+
+paths:
+  /me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentUser
+      summary: Get the current user
+      responses:
+        '200':
+          description: Current user
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Identity]
+      operationId: updateCurrentUser
+      summary: Update the current user's editable profile fields
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List all projects visible to the current user
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: ownership
+          in: query
+          description: Optionally restrict results to owned or shared projects.
+          schema:
+            type: string
+            enum: [all, owned, shared]
+            default: all
+      responses:
+        '200':
+          description: Page of projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created; owner membership is created atomically.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Get a visible project
+      responses:
+        '200':
+          description: Project
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      summary: Update project metadata
+      description: Owner only.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Updated project
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Projects]
+      operationId: deleteProject
+      summary: Permanently delete a project and all descendants
+      description: Owner only. A production UI should require explicit confirmation.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Project deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+
+  /projects/{projectId}/members:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Sharing]
+      operationId: listProjectMembers
+      summary: List project members
+      description: Visible to every project member.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [Sharing]
+      operationId: removeProjectMember
+      summary: Remove a shared member
+      description: Owner only. The owner cannot remove their own membership.
+      responses:
+        '204':
+          description: Member removed, or was already absent
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{projectId}/membership:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    delete:
+      tags: [Sharing]
+      operationId: leaveProject
+      summary: Leave a shared project
+      description: A project owner cannot leave without a future ownership-transfer flow.
+      responses:
+        '204':
+          description: Membership removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{projectId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Sharing]
+      operationId: listProjectInvitations
+      summary: List invitations for a project
+      description: Owner only. Raw invitation tokens are never returned.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, expired]
+      responses:
+        '200':
+          description: Page of invitations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Sharing]
+      operationId: createProjectInvitation
+      summary: Invite one email address to the project
+      description: |
+        Owner only. The API passes the raw token to the configured delivery
+        adapter and returns metadata only. Delete an expired pending invite
+        before creating its replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvitationRequest'
+      responses:
+        '201':
+          description: Invitation created and passed to the delivery adapter
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{projectId}/invitations/{invitationId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/InvitationId'
+    delete:
+      tags: [Sharing]
+      operationId: deleteProjectInvitation
+      summary: Revoke and delete an invitation
+      description: Owner only. Accepted invitations cannot be revoked this way.
+      responses:
+        '204':
+          description: Invitation deleted, or was already absent
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /invitations/accept:
+    post:
+      tags: [Sharing]
+      operationId: acceptProjectInvitation
+      summary: Accept an invitation using its one-time secret
+      description: |
+        The authenticated account must have a verified primary email matching
+        the invitation. The token is sent in the body to reduce log leakage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+      responses:
+        '200':
+          description: Invitation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptInvitationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{projectId}/services:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Services]
+      operationId: listProjectServices
+      summary: List services in a project
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: kind
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: state
+          in: query
+          schema:
+            $ref: '#/components/schemas/ServiceState'
+      responses:
+        '200':
+          description: Page of services
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Services]
+      operationId: createProjectService
+      summary: Create a service in a project
+      description: Every project member has this permission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '201':
+          description: Service created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{projectId}/services/{serviceId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Services]
+      operationId: getProjectService
+      summary: Get a service
+      responses:
+        '200':
+          description: Service
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Services]
+      operationId: updateProjectService
+      summary: Update a service
+      description: Every project member has this permission.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateServiceRequest'
+      responses:
+        '200':
+          description: Updated service
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Services]
+      operationId: deleteProjectService
+      summary: Delete a service and all of its resources
+      description: Every project member has this permission.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Service deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+
+  /projects/{projectId}/services/{serviceId}/resources:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Resources]
+      operationId: listServiceResources
+      summary: List resources belonging to a service
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of service resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Resources]
+      operationId: createServiceResource
+      summary: Create a service resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResourceRequest'
+      responses:
+        '201':
+          description: Resource created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{projectId}/services/{serviceId}/resources/{resourceId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Resources]
+      operationId: getServiceResource
+      summary: Get a service resource
+      responses:
+        '200':
+          description: Resource
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Resources]
+      operationId: updateServiceResource
+      summary: Update a service resource
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateResourceRequest'
+      responses:
+        '200':
+          description: Updated resource
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Resources]
+      operationId: deleteServiceResource
+      summary: Delete a service resource
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Resource deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+
+  /projects/{projectId}/audit-events:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Audit]
+      operationId: listProjectAuditEvents
+      summary: List immutable project audit events
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: action
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Page of audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Process liveness check
+      servers:
+        - url: https://api.example.com
+          description: Health endpoints are outside the /v1 API base path
+      security: []
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Database and required dependency readiness check
+      servers:
+        - url: https://api.example.com
+          description: Health endpoints are outside the /v1 API base path
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: A required dependency is unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      description: |
+        Authorization Code with PKCE. Replace the URL with the configured
+        provider. The API validates access tokens for its own audience.
+      openIdConnectUrl: https://identity.example.com/.well-known/openid-configuration
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ResourceId:
+      name: resourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of results.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by the previous page.
+      schema:
+        type: string
+        maxLength: 2000
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Quoted integer version from the latest ETag, for example `"7"`.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+  headers:
+    ETag:
+      description: Quoted value of the resource's integer version.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+    Location:
+      description: Canonical URL of the created resource.
+      schema:
+        type: string
+        format: uri-reference
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid, expired, or wrong-audience access token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The authenticated user cannot perform this operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The resource does not exist or is outside the caller's visibility.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Unique constraint or resource-state conflict.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: If-Match does not match the current resource version.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationError:
+      description: Request syntax is valid but one or more values are invalid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - display_name
+        - primary_email_verified
+        - status
+        - version
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        primary_email:
+          type: [string, 'null']
+          format: email
+        primary_email_verified:
+          type: boolean
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        avatar_url:
+          type: [string, 'null']
+          format: uri
+        status:
+          type: string
+          enum: [active, disabled]
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateUserRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        avatar_url:
+          type: [string, 'null']
+          format: uri
+
+    Project:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - owner_user_id
+        - name
+        - access_type
+        - version
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        access_type:
+          type: string
+          description: Ownership marker for UI/admin decisions, not a membership role.
+          enum: [owner, shared]
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+
+    UpdateProjectRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+
+    Member:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, is_owner, joined_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        avatar_url:
+          type: [string, 'null']
+          format: uri
+        is_owner:
+          type: boolean
+        joined_at:
+          type: string
+          format: date-time
+
+    Invitation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - email
+        - status
+        - expires_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [pending, accepted, expired]
+        expires_at:
+          type: string
+          format: date-time
+        accepted_by_user_id:
+          type: [string, 'null']
+          format: uuid
+        accepted_at:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    CreateInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        expires_in_hours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 168
+
+    AcceptInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 32
+          maxLength: 2048
+          writeOnly: true
+
+    AcceptInvitationResponse:
+      type: object
+      additionalProperties: false
+      required: [project_id, membership_created]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        membership_created:
+          type: boolean
+
+    ServiceState:
+      type: string
+      enum: [active, disabled]
+
+    Service:
+      type: object
+      additionalProperties: false
+      required:
+        - project_id
+        - id
+        - name
+        - slug
+        - kind
+        - configuration
+        - state
+        - created_by_user_id
+        - version
+        - created_at
+        - updated_at
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+        kind:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        configuration:
+          type: object
+          additionalProperties: true
+          description: Non-secret configuration only; store secret-manager references.
+        state:
+          $ref: '#/components/schemas/ServiceState'
+        created_by_user_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateServiceRequest:
+      type: object
+      additionalProperties: false
+      required: [name, slug, kind]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+        kind:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        configuration:
+          type: object
+          additionalProperties: true
+          default: {}
+        state:
+          $ref: '#/components/schemas/ServiceState'
+
+    UpdateServiceRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 63
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+        kind:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        configuration:
+          type: object
+          additionalProperties: true
+        state:
+          $ref: '#/components/schemas/ServiceState'
+
+    Resource:
+      type: object
+      additionalProperties: false
+      required:
+        - project_id
+        - service_id
+        - id
+        - resource_key
+        - payload
+        - version
+        - created_at
+        - updated_at
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        resource_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        payload:
+          type: object
+          additionalProperties: true
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateResourceRequest:
+      type: object
+      additionalProperties: false
+      required: [resource_key]
+      properties:
+        resource_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        payload:
+          type: object
+          additionalProperties: true
+          default: {}
+
+    UpdateResourceRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        resource_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        payload:
+          type: object
+          additionalProperties: true
+
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - action
+        - resource_type
+        - details
+        - occurred_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        project_id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: [string, 'null']
+          format: uuid
+        request_id:
+          type: [string, 'null']
+          format: uuid
+        action:
+          type: string
+          maxLength: 100
+        resource_type:
+          type: string
+          maxLength: 100
+        resource_id:
+          type: [string, 'null']
+          format: uuid
+        details:
+          type: object
+          additionalProperties: true
+        occurred_at:
+          type: string
+          format: date-time
+
+    ProjectPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        next_cursor:
+          type: [string, 'null']
+
+    MemberPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+        next_cursor:
+          type: [string, 'null']
+
+    InvitationPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invitation'
+        next_cursor:
+          type: [string, 'null']
+
+    ServicePage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+        next_cursor:
+          type: [string, 'null']
+
+    ResourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resource'
+        next_cursor:
+          type: [string, 'null']
+
+    AuditEventPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        next_cursor:
+          type: [string, 'null']
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: https://api.example.com/problems/validation-error
+        title:
+          type: string
+          example: Request validation failed
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 422
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          example: validation_error
+        request_id:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+      additionalProperties: true
+
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
