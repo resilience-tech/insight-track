@@ -6,7 +6,7 @@
     "noEmit": true,
     "strict": true,
     "types": ["node"],
-    "target": "ES2024"
+    "target": "ES2023"
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }
