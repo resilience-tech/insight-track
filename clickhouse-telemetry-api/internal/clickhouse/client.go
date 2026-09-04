@@ -139,21 +139,21 @@ func (c *Client) InsertSpans(ctx context.Context, projectID, serviceID string, i
 }
 
 func (c *Client) ListMetrics(ctx context.Context, filter telemetry.MetricFilter) ([]telemetry.Metric, error) {
-	where, params := listWhere("timestamp", filter.ListFilter)
+	where, params := listWhere("m", "timestamp", filter.ListFilter)
 	if filter.Name != "" {
-		where = append(where, "name = {metric_name:String}")
+		where = append(where, "m.name = {metric_name:String}")
 		params.Set("param_metric_name", filter.Name)
 	}
 	query := fmt.Sprintf(`SELECT
-		toString(id) AS id,
-		toString(project_id) AS project_id,
-		toString(service_id) AS service_id,
-		toUnixTimestamp64Milli(timestamp) AS timestamp_ms,
-		name, value, unit, attributes,
-		toUnixTimestamp64Milli(ingested_at) AS ingested_at_ms
-	FROM metrics
+		toString(m.id) AS id,
+		toString(m.project_id) AS project_id,
+		toString(m.service_id) AS service_id,
+		toUnixTimestamp64Milli(m.timestamp) AS timestamp_ms,
+		m.name AS name, m.value AS value, m.unit AS unit, m.attributes AS attributes,
+		toUnixTimestamp64Milli(m.ingested_at) AS ingested_at_ms
+	FROM metrics AS m
 	WHERE %s
-	ORDER BY timestamp DESC, id DESC
+	ORDER BY m.timestamp DESC, m.id DESC
 	LIMIT %d
 	FORMAT JSONEachRow`, strings.Join(where, " AND "), filter.Limit)
 	type row struct {
@@ -184,25 +184,26 @@ func (c *Client) ListMetrics(ctx context.Context, filter telemetry.MetricFilter)
 }
 
 func (c *Client) ListLogs(ctx context.Context, filter telemetry.LogFilter) ([]telemetry.Log, error) {
-	where, params := listWhere("timestamp", filter.ListFilter)
+	where, params := listWhere("l", "timestamp", filter.ListFilter)
 	if filter.Severity != "" {
-		where = append(where, "severity = {severity:String}")
+		where = append(where, "l.severity = {severity:String}")
 		params.Set("param_severity", filter.Severity)
 	}
 	if filter.Search != "" {
-		where = append(where, "positionCaseInsensitiveUTF8(message, {search:String}) > 0")
+		where = append(where, "positionCaseInsensitiveUTF8(l.message, {search:String}) > 0")
 		params.Set("param_search", filter.Search)
 	}
 	query := fmt.Sprintf(`SELECT
-		toString(id) AS id,
-		toString(project_id) AS project_id,
-		toString(service_id) AS service_id,
-		toUnixTimestamp64Milli(timestamp) AS timestamp_ms,
-		severity, message, trace_id, span_id, attributes,
-		toUnixTimestamp64Milli(ingested_at) AS ingested_at_ms
-	FROM logs
+		toString(l.id) AS id,
+		toString(l.project_id) AS project_id,
+		toString(l.service_id) AS service_id,
+		toUnixTimestamp64Milli(l.timestamp) AS timestamp_ms,
+		l.severity AS severity, l.message AS message, l.trace_id AS trace_id,
+		l.span_id AS span_id, l.attributes AS attributes,
+		toUnixTimestamp64Milli(l.ingested_at) AS ingested_at_ms
+	FROM logs AS l
 	WHERE %s
-	ORDER BY timestamp DESC, id DESC
+	ORDER BY l.timestamp DESC, l.id DESC
 	LIMIT %d
 	FORMAT JSONEachRow`, strings.Join(where, " AND "), filter.Limit)
 	type row struct {
@@ -235,26 +236,27 @@ func (c *Client) ListLogs(ctx context.Context, filter telemetry.LogFilter) ([]te
 }
 
 func (c *Client) ListSpans(ctx context.Context, filter telemetry.SpanFilter) ([]telemetry.Span, error) {
-	where, params := listWhere("start_time", filter.ListFilter)
+	where, params := listWhere("s", "start_time", filter.ListFilter)
 	if filter.Status != "" {
-		where = append(where, "status = {status:String}")
+		where = append(where, "s.status = {status:String}")
 		params.Set("param_status", filter.Status)
 	}
 	if filter.TraceID != "" {
-		where = append(where, "trace_id = {trace_id:String}")
+		where = append(where, "s.trace_id = {trace_id:String}")
 		params.Set("param_trace_id", filter.TraceID)
 	}
 	query := fmt.Sprintf(`SELECT
-		toString(id) AS id,
-		toString(project_id) AS project_id,
-		toString(service_id) AS service_id,
-		trace_id, span_id, parent_span_id, name,
-		toUnixTimestamp64Milli(start_time) AS start_time_ms,
-		duration_ms, status, attributes,
-		toUnixTimestamp64Milli(ingested_at) AS ingested_at_ms
-	FROM spans
+		toString(s.id) AS id,
+		toString(s.project_id) AS project_id,
+		toString(s.service_id) AS service_id,
+		s.trace_id AS trace_id, s.span_id AS span_id, s.parent_span_id AS parent_span_id,
+		s.name AS name,
+		toUnixTimestamp64Milli(s.start_time) AS start_time_ms,
+		s.duration_ms AS duration_ms, s.status AS status, s.attributes AS attributes,
+		toUnixTimestamp64Milli(s.ingested_at) AS ingested_at_ms
+	FROM spans AS s
 	WHERE %s
-	ORDER BY start_time DESC, id DESC
+	ORDER BY s.start_time DESC, s.id DESC
 	LIMIT %d
 	FORMAT JSONEachRow`, strings.Join(where, " AND "), filter.Limit)
 	type row struct {
@@ -405,12 +407,13 @@ func (c *Client) post(ctx context.Context, body io.Reader, params url.Values) (*
 	return nil, fmt.Errorf("ClickHouse returned %d: %s", response.StatusCode, detail)
 }
 
-func listWhere(timeColumn string, filter telemetry.ListFilter) ([]string, url.Values) {
+func listWhere(tableAlias, timeColumn string, filter telemetry.ListFilter) ([]string, url.Values) {
+	qualifiedTime := tableAlias + "." + timeColumn
 	where := []string{
-		"project_id = {project_id:UUID}",
-		"service_id = {service_id:UUID}",
-		fmt.Sprintf("%s >= fromUnixTimestamp64Milli({from_ms:Int64})", timeColumn),
-		fmt.Sprintf("%s < fromUnixTimestamp64Milli({to_ms:Int64})", timeColumn),
+		tableAlias + ".project_id = {project_id:UUID}",
+		tableAlias + ".service_id = {service_id:UUID}",
+		fmt.Sprintf("%s >= fromUnixTimestamp64Milli({from_ms:Int64})", qualifiedTime),
+		fmt.Sprintf("%s < fromUnixTimestamp64Milli({to_ms:Int64})", qualifiedTime),
 	}
 	params := url.Values{
 		"param_project_id": {filter.ProjectID},
@@ -419,7 +422,7 @@ func listWhere(timeColumn string, filter telemetry.ListFilter) ([]string, url.Va
 		"param_to_ms":      {strconv.FormatInt(filter.To.UnixMilli(), 10)},
 	}
 	if filter.Before != nil {
-		where = append(where, fmt.Sprintf("(%s, id) < (fromUnixTimestamp64Milli({before_ms:Int64}), {before_id:UUID})", timeColumn))
+		where = append(where, fmt.Sprintf("(%s, %s.id) < (fromUnixTimestamp64Milli({before_ms:Int64}), {before_id:UUID})", qualifiedTime, tableAlias))
 		params.Set("param_before_ms", strconv.FormatInt(filter.Before.Time.UnixMilli(), 10))
 		params.Set("param_before_id", filter.Before.ID)
 	}

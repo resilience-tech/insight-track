@@ -14,15 +14,15 @@ type MetricInput struct {
 }
 
 type Metric struct {
-	ID          string            `json:"id"`
-	ProjectID   string            `json:"project_id"`
-	ServiceID   string            `json:"service_id"`
-	Timestamp   time.Time         `json:"timestamp"`
-	Name        string            `json:"name"`
-	Value       float64           `json:"value"`
-	Unit        string            `json:"unit"`
-	Attributes  map[string]string `json:"attributes"`
-	IngestedAt  time.Time         `json:"ingested_at"`
+	ID         string            `json:"id"`
+	ProjectID  string            `json:"project_id"`
+	ServiceID  string            `json:"service_id"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Name       string            `json:"name"`
+	Value      float64           `json:"value"`
+	Unit       string            `json:"unit"`
+	Attributes map[string]string `json:"attributes"`
+	IngestedAt time.Time         `json:"ingested_at"`
 }
 
 type LogInput struct {
@@ -35,16 +35,16 @@ type LogInput struct {
 }
 
 type Log struct {
-	ID          string            `json:"id"`
-	ProjectID   string            `json:"project_id"`
-	ServiceID   string            `json:"service_id"`
-	Timestamp   time.Time         `json:"timestamp"`
-	Severity    string            `json:"severity"`
-	Message     string            `json:"message"`
-	TraceID     string            `json:"trace_id,omitempty"`
-	SpanID      string            `json:"span_id,omitempty"`
-	Attributes  map[string]string `json:"attributes"`
-	IngestedAt  time.Time         `json:"ingested_at"`
+	ID         string            `json:"id"`
+	ProjectID  string            `json:"project_id"`
+	ServiceID  string            `json:"service_id"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Severity   string            `json:"severity"`
+	Message    string            `json:"message"`
+	TraceID    string            `json:"trace_id,omitempty"`
+	SpanID     string            `json:"span_id,omitempty"`
+	Attributes map[string]string `json:"attributes"`
+	IngestedAt time.Time         `json:"ingested_at"`
 }
 
 type SpanInput struct {

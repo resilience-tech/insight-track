@@ -19,26 +19,26 @@ import (
 )
 
 const (
-	maximumBodyBytes       = 2 << 20
-	maximumBatchItems      = 1000
-	defaultPageLimit       = 100
-	maximumPageLimit       = 1000
-	maximumQueryRange      = 31 * 24 * time.Hour
-	maximumClockSkew       = 5 * time.Minute
-	maximumAttributes      = 64
-	maximumAttributeKey    = 128
-	maximumAttributeValue  = 1024
-	maximumNameLength      = 200
-	maximumUnitLength      = 64
-	maximumLogMessage      = 8192
-	maximumSearchLength    = 200
-	maximumCursorLength    = 2048
-	maximumSpanDurationMS  = 24 * 60 * 60 * 1000
+	maximumBodyBytes      = 2 << 20
+	maximumBatchItems     = 1000
+	defaultPageLimit      = 100
+	maximumPageLimit      = 1000
+	maximumQueryRange     = 31 * 24 * time.Hour
+	maximumClockSkew      = 5 * time.Minute
+	maximumAttributes     = 64
+	maximumAttributeKey   = 128
+	maximumAttributeValue = 1024
+	maximumNameLength     = 200
+	maximumUnitLength     = 64
+	maximumLogMessage     = 8192
+	maximumSearchLength   = 200
+	maximumCursorLength   = 2048
+	maximumSpanDurationMS = 24 * 60 * 60 * 1000
 )
 
 var (
-	errBodyTooLarge       = errors.New("request body is too large")
-	errUnsupportedMedia   = errors.New("Content-Type must be application/json")
+	errBodyTooLarge     = errors.New("request body is too large")
+	errUnsupportedMedia = errors.New("Content-Type must be application/json")
 )
 
 type page[T any] struct {
