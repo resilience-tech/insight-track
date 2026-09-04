@@ -26,8 +26,8 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: architecture-graph-api/package-lock.json
-      - run: npm ci
-      - run: npm run check
+      - run: npm ci --workspaces=false
+      - run: npm run check --workspaces=false
       - run: docker compose config --quiet
 
   integration:
