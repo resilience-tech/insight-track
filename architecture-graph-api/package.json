@@ -1,0 +1,19 @@
+{
+  "name": "@insight-track/architecture-graph-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "typescript": "5.5.3"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "dev": "node --watch src/main.ts",
+    "test": "node --test test/*.test.ts",
+    "check": "tsc --noEmit && node --check src/*.ts && node --test test/*.test.ts"
+  }
+}

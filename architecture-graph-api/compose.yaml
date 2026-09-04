@@ -1,0 +1,52 @@
+name: insight-track-architecture-graph
+
+services:
+  neo4j:
+    image: neo4j:2026.07.1
+    environment:
+      NEO4J_AUTH: neo4j/neo4j-local-password
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - cypher-shell -u neo4j -p neo4j-local-password 'RETURN 1' >/dev/null 2>&1
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    environment:
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      API_TOKEN: local-architecture-token-0123456789abcdef
+      NEO4J_HTTP_URL: http://neo4j:7474
+      NEO4J_DATABASE: neo4j
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: neo4j-local-password
+      LOG_LEVEL: info
+    ports:
+      - "127.0.0.1:8083:8080"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://127.0.0.1:8080/health/ready | grep -q '"status":"ok"'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  neo4j-data:
+  neo4j-logs:

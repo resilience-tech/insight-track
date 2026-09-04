@@ -1,0 +1,40 @@
+name: architecture-graph-api
+
+on:
+  push:
+    paths:
+      - "architecture-graph-api/**"
+      - ".github/workflows/architecture-graph-api.yml"
+  pull_request:
+    paths:
+      - "architecture-graph-api/**"
+      - ".github/workflows/architecture-graph-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: architecture-graph-api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: architecture-graph-api/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: docker compose config --quiet
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: architecture-graph-api
+    steps:
+      - uses: actions/checkout@v5
+      - run: timeout 12m ./scripts/smoke.sh

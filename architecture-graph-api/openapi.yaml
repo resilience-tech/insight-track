@@ -1,0 +1,725 @@
+openapi: 3.1.0
+info:
+  title: InsightTrack Architecture Graph API
+  version: 0.1.0
+  description: Store complete software architecture in Neo4j and answer natural-language questions with safe Cypher templates.
+servers:
+  - url: http://localhost:8083
+security:
+  - BearerAuth: []
+tags:
+  - name: Health
+  - name: Schema
+  - name: Graphs
+  - name: Nodes
+  - name: Questions
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      security: []
+      responses:
+        "200":
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      security: []
+      responses:
+        "200":
+          description: Neo4j is reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "502":
+          $ref: "#/components/responses/GraphStoreError"
+  /v1/schema:
+    get:
+      tags: [Schema]
+      operationId: getArchitectureSchema
+      responses:
+        "200":
+          description: Supported node kinds, relationship types, and question intents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [node_kinds, relationship_types, question_intents, example_questions]
+                properties:
+                  node_kinds:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NodeKind"
+                  relationship_types:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RelationshipType"
+                  question_intents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/QuestionIntent"
+                  example_questions:
+                    type: array
+                    items:
+                      type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/graphs:
+    get:
+      tags: [Graphs]
+      operationId: listGraphs
+      responses:
+        "200":
+          description: Architecture graphs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ArchitectureGraph"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/graphs/{graphId}:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+    get:
+      tags: [Graphs]
+      operationId: getGraph
+      responses:
+        "200":
+          description: Graph metadata and counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchitectureGraph"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Graphs]
+      operationId: upsertGraph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchitectureGraphInput"
+      responses:
+        "200":
+          description: Graph metadata was created or updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchitectureGraph"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/graphs/{graphId}/snapshot:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+    get:
+      tags: [Graphs]
+      operationId: exportGraphSnapshot
+      responses:
+        "200":
+          description: Portable architecture snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchitectureSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Graphs]
+      operationId: replaceGraphSnapshot
+      description: Atomically replaces every architecture node and relationship in the graph.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchitectureSnapshotInput"
+      responses:
+        "200":
+          description: Imported snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchitectureSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/graphs/{graphId}/questions:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+    post:
+      tags: [Questions]
+      operationId: askArchitectureQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Answer with graph evidence and the executed Cypher template.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionAnswer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/graphs/{graphId}/nodes:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+    get:
+      tags: [Nodes]
+      operationId: listArchitectureNodes
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - name: kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/NodeKind"
+        - $ref: "#/components/parameters/Limit1000"
+      responses:
+        "200":
+          description: Matching architecture nodes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ArchitectureNode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /v1/graphs/{graphId}/nodes/{nodeId}:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+      - $ref: "#/components/parameters/NodeId"
+    get:
+      tags: [Nodes]
+      operationId: getArchitectureNode
+      responses:
+        "200":
+          description: Architecture node.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchitectureNode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/graphs/{graphId}/nodes/{nodeId}/dependencies:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+      - $ref: "#/components/parameters/NodeId"
+    get:
+      tags: [Nodes]
+      operationId: getNodeDependencies
+      parameters:
+        - $ref: "#/components/parameters/MaxDepth"
+        - $ref: "#/components/parameters/Limit200"
+      responses:
+        "200":
+          description: Bounded outgoing dependency paths.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutedGraphQuery"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/graphs/{graphId}/nodes/{nodeId}/dependents:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+      - $ref: "#/components/parameters/NodeId"
+    get:
+      tags: [Nodes]
+      operationId: getNodeDependents
+      parameters:
+        - $ref: "#/components/parameters/MaxDepth"
+        - $ref: "#/components/parameters/Limit200"
+      responses:
+        "200":
+          description: Bounded incoming dependency paths.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutedGraphQuery"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/graphs/{graphId}/paths:
+    parameters:
+      - $ref: "#/components/parameters/GraphId"
+    get:
+      tags: [Nodes]
+      operationId: getShortestArchitecturePath
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/PortableId"
+        - name: to
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/PortableId"
+        - $ref: "#/components/parameters/MaxDepth"
+      responses:
+        "200":
+          description: Shortest connection between two nodes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutedGraphQuery"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    GraphId:
+      name: graphId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PortableId"
+    NodeId:
+      name: nodeId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PortableId"
+    MaxDepth:
+      name: max_depth
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 15
+        default: 8
+    Limit200:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Limit1000:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+  responses:
+    Unauthorized:
+      description: Missing or invalid internal bearer token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Requested graph or node does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ValidationError:
+      description: Request could not be validated or the question needs more context.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PayloadTooLarge:
+      description: Request exceeds 2 MiB.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    GraphStoreError:
+      description: Neo4j could not complete the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          const: ok
+    PortableId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    NodeKind:
+      type: string
+      enum:
+        - system
+        - frontend
+        - page
+        - component
+        - action
+        - service
+        - endpoint
+        - handler
+        - function
+        - middleware
+        - repository
+        - cache
+        - database
+        - table
+        - column
+        - constraint
+        - external_service
+        - identity_provider
+        - queue
+        - topic
+        - job
+        - library
+        - runtime
+        - infrastructure
+        - environment
+        - config
+        - event
+    RelationshipType:
+      type: string
+      enum:
+        - HAS_SERVICE
+        - HAS_FRONTEND
+        - CONTAINS
+        - EXPOSES
+        - HANDLED_BY
+        - TRIGGERS
+        - CALLS
+        - USES_MIDDLEWARE
+        - USES_DATABASE
+        - USES_CACHE
+        - USES_IDENTITY_PROVIDER
+        - USES_EXTERNAL_SERVICE
+        - READS_FROM
+        - WRITES_TO
+        - HAS_COLUMN
+        - HAS_CONSTRAINT
+        - PUBLISHES_TO
+        - CONSUMES_FROM
+        - DEPENDS_ON
+        - DEPLOYED_TO
+        - EMITS
+    QuestionIntent:
+      type: string
+      enum: [summary, dependencies, dependents, shortest_path, root_causes, blast_radius, data_access]
+    Metadata:
+      type: object
+      maxProperties: 64
+      additionalProperties:
+        oneOf:
+          - type: string
+            maxLength: 2000
+          - type: number
+          - type: boolean
+    ArchitectureGraphInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+    ArchitectureGraph:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, node_count, relationship_count, created_at, updated_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/PortableId"
+        name:
+          type: string
+        description:
+          type: string
+        node_count:
+          type: integer
+          minimum: 0
+        relationship_count:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ArchitectureNodeInput:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name]
+      properties:
+        id:
+          $ref: "#/components/schemas/PortableId"
+        kind:
+          $ref: "#/components/schemas/NodeKind"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 240
+        description:
+          type: string
+          maxLength: 2000
+        technology:
+          type: string
+          maxLength: 160
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    ArchitectureNode:
+      type: object
+      additionalProperties: false
+      required: [id, graph_id, kind, name, description, technology, metadata]
+      properties:
+        id:
+          $ref: "#/components/schemas/PortableId"
+        graph_id:
+          $ref: "#/components/schemas/PortableId"
+        kind:
+          $ref: "#/components/schemas/NodeKind"
+        name:
+          type: string
+        description:
+          type: string
+        technology:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    ArchitectureRelationshipInput:
+      type: object
+      additionalProperties: false
+      required: [id, type, from, to]
+      properties:
+        id:
+          $ref: "#/components/schemas/PortableId"
+        type:
+          $ref: "#/components/schemas/RelationshipType"
+        from:
+          $ref: "#/components/schemas/PortableId"
+        to:
+          $ref: "#/components/schemas/PortableId"
+        description:
+          type: string
+          maxLength: 2000
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    ArchitectureRelationship:
+      type: object
+      additionalProperties: false
+      required: [id, graph_id, type, from, to, description, metadata]
+      properties:
+        id:
+          $ref: "#/components/schemas/PortableId"
+        graph_id:
+          $ref: "#/components/schemas/PortableId"
+        type:
+          $ref: "#/components/schemas/RelationshipType"
+        from:
+          $ref: "#/components/schemas/PortableId"
+        to:
+          $ref: "#/components/schemas/PortableId"
+        description:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    ArchitectureSnapshotInput:
+      type: object
+      additionalProperties: false
+      required: [nodes, relationships]
+      properties:
+        nodes:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: "#/components/schemas/ArchitectureNodeInput"
+        relationships:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: "#/components/schemas/ArchitectureRelationshipInput"
+    ArchitectureSnapshot:
+      type: object
+      additionalProperties: false
+      required: [graph_id, nodes, relationships]
+      properties:
+        graph_id:
+          $ref: "#/components/schemas/PortableId"
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchitectureNode"
+        relationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchitectureRelationship"
+    EvidencePath:
+      type: object
+      additionalProperties: false
+      required: [nodes, relationships, hops]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchitectureNode"
+        relationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchitectureRelationship"
+        hops:
+          type: integer
+          minimum: 1
+    ExecutedGraphQuery:
+      type: object
+      additionalProperties: false
+      required: [template, cypher, parameters, paths]
+      properties:
+        template:
+          type: string
+        cypher:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        paths:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidencePath"
+    QuestionInput:
+      type: object
+      additionalProperties: false
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 3
+          maxLength: 1000
+        focus_node_id:
+          $ref: "#/components/schemas/PortableId"
+        target_node_id:
+          $ref: "#/components/schemas/PortableId"
+        max_depth:
+          type: integer
+          minimum: 1
+          maximum: 15
+          default: 8
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+    QuestionAnswer:
+      type: object
+      additionalProperties: false
+      required: [question, intent, answer, matched_entities, evidence, graph_query]
+      properties:
+        question:
+          type: string
+        intent:
+          $ref: "#/components/schemas/QuestionIntent"
+        answer:
+          type: string
+        matched_entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchitectureNode"
+        evidence:
+          type: object
+          required: [paths]
+          properties:
+            paths:
+              type: array
+              items:
+                $ref: "#/components/schemas/EvidencePath"
+            summary:
+              type: object
+              additionalProperties: true
+        graph_query:
+          type: object
+          additionalProperties: false
+          required: [template, cypher, parameters]
+          properties:
+            template:
+              type: string
+            cypher:
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+            parameters:
+              type: object
+              additionalProperties: true
+    Problem:
+      type: object
+      required: [type, title, status, detail, request_id]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        request_id:
+          type: string
