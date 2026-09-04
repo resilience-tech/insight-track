@@ -1,0 +1,5 @@
+.env
+bin/
+coverage.out
+*.log
+clickhouse-telemetry-api

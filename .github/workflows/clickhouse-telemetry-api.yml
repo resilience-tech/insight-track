@@ -1,0 +1,43 @@
+name: clickhouse-telemetry-api
+
+on:
+  push:
+    paths:
+      - "clickhouse-telemetry-api/**"
+      - ".github/workflows/clickhouse-telemetry-api.yml"
+  pull_request:
+    paths:
+      - "clickhouse-telemetry-api/**"
+      - ".github/workflows/clickhouse-telemetry-api.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clickhouse-telemetry-api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.27.1
+          cache: false
+      - name: Check formatting
+        run: |
+          gofmt -w .
+          git diff --exit-code
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: docker compose config --quiet
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clickhouse-telemetry-api
+    steps:
+      - uses: actions/checkout@v5
+      - run: timeout 10m ./scripts/smoke.sh

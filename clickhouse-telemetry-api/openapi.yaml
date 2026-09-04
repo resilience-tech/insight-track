@@ -1,0 +1,696 @@
+openapi: 3.1.0
+info:
+  title: Insight Track ClickHouse Telemetry API
+  version: 1.0.0
+  description: |
+    Internal REST API for writing and querying project/service telemetry in
+    ClickHouse. The public control-plane API must authorize project membership
+    before calling this service.
+servers:
+  - url: http://localhost:8082/v1
+    description: Local Docker Compose environment
+security:
+  - internalBearer: []
+tags:
+  - name: Telemetry
+  - name: Health
+
+paths:
+  /projects/{projectId}/services/{serviceId}/telemetry/summary:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Telemetry]
+      operationId: getTelemetrySummary
+      summary: Summarize telemetry for one service
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Telemetry summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Summary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+
+  /projects/{projectId}/services/{serviceId}/telemetry/metrics:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Telemetry]
+      operationId: listMetrics
+      summary: List metric points
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: name
+          in: query
+          description: Exact metric name.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+      responses:
+        '200':
+          description: Page of metric points
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+    post:
+      tags: [Telemetry]
+      operationId: ingestMetrics
+      summary: Ingest a metric batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricBatch'
+      responses:
+        '200':
+          description: Batch written to ClickHouse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+
+  /projects/{projectId}/services/{serviceId}/telemetry/logs:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Telemetry]
+      operationId: listLogs
+      summary: List log entries
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/LogSeverity'
+        - name: search
+          in: query
+          description: Case-insensitive message substring.
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        '200':
+          description: Page of log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+    post:
+      tags: [Telemetry]
+      operationId: ingestLogs
+      summary: Ingest a log batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogBatch'
+      responses:
+        '200':
+          description: Batch written to ClickHouse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+
+  /projects/{projectId}/services/{serviceId}/telemetry/traces:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ServiceId'
+    get:
+      tags: [Telemetry]
+      operationId: listTraceSpans
+      summary: List trace spans
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/SpanStatus'
+        - name: trace_id
+          in: query
+          schema:
+            $ref: '#/components/schemas/TraceId'
+      responses:
+        '200':
+          description: Page of trace spans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpanPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+    post:
+      tags: [Telemetry]
+      operationId: ingestTraceSpans
+      summary: Ingest a trace span batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpanBatch'
+      responses:
+        '200':
+          description: Batch written to ClickHouse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/TelemetryStoreError'
+
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Check process liveness
+      security: []
+      servers:
+        - url: http://localhost:8082
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Check ClickHouse readiness
+      security: []
+      servers:
+        - url: http://localhost:8082
+      responses:
+        '200':
+          description: API and ClickHouse are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: ClickHouse is unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    internalBearer:
+      type: http
+      scheme: bearer
+      description: Internal service-to-service token supplied through API_TOKEN.
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    From:
+      name: from
+      in: query
+      description: Inclusive range start. Defaults to one hour before `to`.
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      description: Exclusive range end. Defaults to the current time.
+      schema:
+        type: string
+        format: date-time
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of records returned.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by the previous page.
+      schema:
+        type: string
+        maxLength: 2048
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid internal bearer token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: Request body exceeds 2 MiB.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: Request content type is not application/json.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationError:
+      description: One or more request values are invalid.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TelemetryStoreError:
+      description: ClickHouse could not complete the request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Attributes:
+      type: object
+      maxProperties: 64
+      propertyNames:
+        minLength: 1
+        maxLength: 128
+      additionalProperties:
+        type: string
+        maxLength: 1024
+    LogSeverity:
+      type: string
+      enum: [trace, debug, info, warn, error, fatal]
+    SpanStatus:
+      type: string
+      enum: [unset, ok, error]
+    TraceId:
+      type: string
+      pattern: '^[0-9a-fA-F]{32}$'
+    SpanId:
+      type: string
+      pattern: '^[0-9a-fA-F]{16}$'
+
+    MetricInput:
+      type: object
+      additionalProperties: false
+      required: [timestamp, name, value]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          maxLength: 64
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+    Metric:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, service_id, timestamp, name, value, unit, attributes, ingested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          maxLength: 64
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+        ingested_at:
+          type: string
+          format: date-time
+    MetricBatch:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/MetricInput'
+
+    LogInput:
+      type: object
+      additionalProperties: false
+      required: [timestamp, message]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          $ref: '#/components/schemas/LogSeverity'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 8192
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        span_id:
+          $ref: '#/components/schemas/SpanId'
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+    Log:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, service_id, timestamp, severity, message, attributes, ingested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          $ref: '#/components/schemas/LogSeverity'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 8192
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        span_id:
+          $ref: '#/components/schemas/SpanId'
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+        ingested_at:
+          type: string
+          format: date-time
+    LogBatch:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/LogInput'
+
+    SpanInput:
+      type: object
+      additionalProperties: false
+      required: [trace_id, span_id, name, start_time, duration_ms]
+      properties:
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        span_id:
+          $ref: '#/components/schemas/SpanId'
+        parent_span_id:
+          $ref: '#/components/schemas/SpanId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        start_time:
+          type: string
+          format: date-time
+        duration_ms:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 86400000
+        status:
+          $ref: '#/components/schemas/SpanStatus'
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+    Span:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - service_id
+        - trace_id
+        - span_id
+        - name
+        - start_time
+        - duration_ms
+        - status
+        - attributes
+        - ingested_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        span_id:
+          $ref: '#/components/schemas/SpanId'
+        parent_span_id:
+          $ref: '#/components/schemas/SpanId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        start_time:
+          type: string
+          format: date-time
+        duration_ms:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 86400000
+        status:
+          $ref: '#/components/schemas/SpanStatus'
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+        ingested_at:
+          type: string
+          format: date-time
+    SpanBatch:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/SpanInput'
+
+    MetricPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Metric'
+        next_cursor:
+          type: [string, 'null']
+    LogPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Log'
+        next_cursor:
+          type: [string, 'null']
+    SpanPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Span'
+        next_cursor:
+          type: [string, 'null']
+
+    Summary:
+      type: object
+      additionalProperties: false
+      required:
+        - metric_points
+        - log_entries
+        - spans
+        - error_logs
+        - error_spans
+        - average_span_duration_ms
+      properties:
+        metric_points:
+          type: integer
+          format: int64
+          minimum: 0
+        log_entries:
+          type: integer
+          format: int64
+          minimum: 0
+        spans:
+          type: integer
+          format: int64
+          minimum: 0
+        error_logs:
+          type: integer
+          format: int64
+          minimum: 0
+        error_spans:
+          type: integer
+          format: int64
+          minimum: 0
+        average_span_duration_ms:
+          type: number
+          format: double
+          minimum: 0
+    IngestResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted]
+      properties:
+        accepted:
+          type: integer
+          minimum: 1
+          maximum: 1000
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+      additionalProperties: true
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok

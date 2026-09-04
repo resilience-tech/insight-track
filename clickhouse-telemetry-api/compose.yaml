@@ -1,0 +1,51 @@
+name: insight-track-clickhouse
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.30.9-alpine
+    environment:
+      CLICKHOUSE_DB: insight_track
+      CLICKHOUSE_USER: insight_track
+      CLICKHOUSE_PASSWORD: clickhouse-local-password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - clickhouse-client --user insight_track --password clickhouse-local-password --query 'SELECT 1'
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    environment:
+      HTTP_ADDR: :8080
+      API_TOKEN: local-development-token-0123456789abcdef
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: insight_track
+      CLICKHOUSE_USERNAME: insight_track
+      CLICKHOUSE_PASSWORD: clickhouse-local-password
+      LOG_LEVEL: info
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://127.0.0.1:8080/health/ready | grep -q '"status":"ok"'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  clickhouse-data:
