@@ -92,6 +92,7 @@ bin
 obj
 appsettings.json
 local.settings.json
+functionapp.zip
 
 # Azurite artifacts
 __blobstorage__
