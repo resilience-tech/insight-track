@@ -1,0 +1,237 @@
+INSIGHT TRACK - BACKEND API REFERENCE
+======================================
+Covers: postgres-project-tenancy (Go), clickhouse-telemetry-api (Go), architecture-graph-api (Node/TS)
+Generated from each service's openapi.yaml. All request/response bodies are JSON unless noted.
+
+
+==================================================================
+1. POSTGRES-PROJECT-TENANCY  (base: http://localhost:8080, spec prefix /v1)
+   Auth: OAuth2/OIDC bearer token (Keycloak)
+   Concurrency: GET responses return ETag header; PATCH/DELETE require If-Match header
+==================================================================
+
+GET /me
+  Request: none
+  Response 200: User { id, display_name, avatar_url, state(active|disabled), version, created_at, updated_at }
+
+PATCH /me
+  Request header: If-Match
+  Request body (application/merge-patch+json): UpdateUserRequest { display_name?, avatar_url? }
+  Response 200: User
+
+GET /projects
+  Request query: limit, cursor, ownership(all|owned|shared, default all)
+  Response 200: ProjectPage { items: Project[], next_cursor }
+
+POST /projects
+  Request body: CreateProjectRequest { name (required), description? }
+  Response 201: Project { id, owner_user_id, name, description, access_type(owner|shared), version, created_at, updated_at }
+
+GET /projects/{projectId}
+  Response 200: Project
+
+PATCH /projects/{projectId}  (owner only)
+  Request header: If-Match
+  Request body (merge-patch+json): UpdateProjectRequest { name?, description? }
+  Response 200: Project
+
+DELETE /projects/{projectId}  (owner only, cascades)
+  Request header: If-Match
+  Response 204: (empty)
+
+GET /projects/{projectId}/members
+  Request query: limit, cursor
+  Response 200: MemberPage { items: Member[]{ user_id, display_name, avatar_url, is_owner, joined_at }, next_cursor }
+
+DELETE /projects/{projectId}/members/{userId}  (owner only)
+  Response 204: (empty)
+
+DELETE /projects/{projectId}/membership  (leave project, non-owner)
+  Response 204: (empty)
+
+GET /projects/{projectId}/invitations  (owner only)
+  Request query: limit, cursor, status(pending|accepted|expired)
+  Response 200: InvitationPage { items: Invitation[], next_cursor }
+
+POST /projects/{projectId}/invitations  (owner only)
+  Request body: CreateInvitationRequest { email (required), expires_in_hours? (1-720, default 168) }
+  Response 201: Invitation { id, project_id, email, status, expires_at, accepted_by_user_id, accepted_at, created_at }
+
+DELETE /projects/{projectId}/invitations/{invitationId}  (owner only, revoke)
+  Response 204: (empty)
+
+POST /invitations/accept
+  Request body: AcceptInvitationRequest { token (required, write-only) }
+  Response 200: AcceptInvitationResponse { project_id, membership_created }
+
+GET /projects/{projectId}/services
+  Request query: limit, cursor, kind?, state(active|disabled)?
+  Response 200: ServicePage { items: Service[], next_cursor }
+
+POST /projects/{projectId}/services  (any project member)
+  Request body: CreateServiceRequest { name, slug, kind (required), description?, configuration?(object, default {}), state? }
+  Response 201: Service { project_id, id, name, slug, kind, description, configuration, state, created_by_user_id, version, created_at, updated_at }
+
+GET /projects/{projectId}/services/{serviceId}
+  Response 200: Service
+
+PATCH /projects/{projectId}/services/{serviceId}  (any project member)
+  Request header: If-Match
+  Request body (merge-patch+json): UpdateServiceRequest { name?, slug?, kind?, description?, configuration?, state? }
+  Response 200: Service
+
+DELETE /projects/{projectId}/services/{serviceId}  (any project member, cascades to resources)
+  Request header: If-Match
+  Response 204: (empty)
+
+GET /projects/{projectId}/services/{serviceId}/resources
+  Request query: limit, cursor
+  Response 200: ResourcePage { items: Resource[], next_cursor }
+
+POST /projects/{projectId}/services/{serviceId}/resources
+  Request body: CreateResourceRequest { resource_key (required), payload?(object) }
+  Response 201: Resource { project_id, service_id, id, resource_key, payload, version, created_at, updated_at }
+
+GET /projects/{projectId}/services/{serviceId}/resources/{resourceId}
+  Response 200: Resource
+
+PATCH /projects/{projectId}/services/{serviceId}/resources/{resourceId}
+  Request header: If-Match
+  Request body (merge-patch+json): UpdateResourceRequest { resource_key?, payload? }
+  Response 200: Resource
+
+DELETE /projects/{projectId}/services/{serviceId}/resources/{resourceId}
+  Request header: If-Match
+  Response 204: (empty)
+
+GET /projects/{projectId}/audit-events
+  Request query: limit, cursor, action?
+  Response 200: AuditEventPage { items: AuditEvent[], next_cursor }
+
+GET /health/live
+  Response 200: Health { status }
+
+GET /health/ready
+  Response 200: Health { status }
+  Response 503: Problem (a dependency is unavailable)
+
+Error format (all 4xx/5xx): application/problem+json -> Problem { type, title, status, detail, instance, ... }
+Common error responses: 401 Unauthorized, 403 Forbidden, 404 NotFound, 409 Conflict, 412 PreconditionFailed, 422 ValidationError
+
+
+==================================================================
+2. CLICKHOUSE-TELEMETRY-API  (base: http://localhost:8082, spec prefix /v1)
+   Auth: static internal bearer token (API_TOKEN) - internal/service-to-service only
+   Scope: every telemetry route is scoped by {projectId} and {serviceId}
+==================================================================
+
+GET /projects/{projectId}/services/{serviceId}/telemetry/summary
+  Request query: from?, to? (default: previous hour, max span 31 days)
+  Response 200: Summary { counts / error rates / avg span duration (per README) }
+
+GET /projects/{projectId}/services/{serviceId}/telemetry/metrics
+  Request query: from?, to?, limit?(1-1000, default 100), cursor?, name?
+  Response 200: MetricPage { items: Metric[]{ id, project_id, service_id, timestamp, name, value, unit, attributes, ingested_at }, next_cursor }
+
+POST /projects/{projectId}/services/{serviceId}/telemetry/metrics
+  Request body: MetricBatch { items: MetricInput[]{ timestamp, name, value (required), unit?, attributes? } } (1-1000 items, max 2MiB)
+  Response 200: IngestResponse { accepted: <count> }
+
+GET /projects/{projectId}/services/{serviceId}/telemetry/logs
+  Request query: from?, to?, limit?, cursor?, severity?(trace|debug|info|warn|error|fatal), search?(message substring)
+  Response 200: LogPage { items: Log[]{ id, project_id, service_id, timestamp, severity, message, trace_id, span_id, attributes, ingested_at }, next_cursor }
+
+POST /projects/{projectId}/services/{serviceId}/telemetry/logs
+  Request body: LogBatch { items: LogInput[]{ timestamp, message (required), severity?, trace_id?, span_id?, attributes? } }
+  Response 200: IngestResponse { accepted }
+
+GET /projects/{projectId}/services/{serviceId}/telemetry/traces
+  Request query: from?, to?, limit?, cursor?, status?(unset|ok|error), trace_id?
+  Response 200: SpanPage { items: Span[]{ id, project_id, service_id, trace_id, span_id, parent_span_id, name, start_time, duration_ms, status, attributes, ingested_at }, next_cursor }
+
+POST /projects/{projectId}/services/{serviceId}/telemetry/traces
+  Request body: SpanBatch { items: SpanInput[]{ trace_id, span_id, name, start_time, duration_ms (required), parent_span_id?, status?, attributes? } }
+  Response 200: IngestResponse { accepted }
+
+GET /health/live
+  Response 200: Health { status }  (no auth)
+
+GET /health/ready
+  Response 200: Health { status }  (no auth, checks ClickHouse)
+
+Error format: application/problem+json -> Problem
+Common error responses: 401 Unauthorized, 413 PayloadTooLarge (>2MiB), 415 UnsupportedMediaType (non-JSON), 422 ValidationError, 502 TelemetryStoreError (ClickHouse failure)
+
+
+==================================================================
+3. ARCHITECTURE-GRAPH-API  (base: http://localhost:8083, spec prefix /v1)
+   Auth: bearer token (API_TOKEN)
+   Storage: Neo4j (architecture modeled as a graph)
+==================================================================
+
+GET /health/live
+  Response 200: Health { status }  (no auth)
+
+GET /health/ready
+  Response 200: Health { status }  (no auth)
+  Response 502: GraphStoreError
+
+GET /v1/schema
+  Response 200: { node_kinds: NodeKind[], relationship_types: RelationshipType[], question_intents: QuestionIntent[], example_questions: string[] }
+
+GET /v1/graphs
+  Response 200: { items: ArchitectureGraph[] }
+
+GET /v1/graphs/{graphId}
+  Response 200: ArchitectureGraph (metadata + node/relationship counts)
+
+PUT /v1/graphs/{graphId}
+  Request body: ArchitectureGraphInput
+  Response 200: ArchitectureGraph (created or updated)
+
+GET /v1/graphs/{graphId}/snapshot
+  Response 200: ArchitectureSnapshot (full portable export of nodes + relationships)
+
+PUT /v1/graphs/{graphId}/snapshot
+  Request body: ArchitectureSnapshotInput (replaces every node/relationship atomically)
+  Response 200: ArchitectureSnapshot
+  Response 413: PayloadTooLarge
+
+POST /v1/graphs/{graphId}/questions
+  Request body: QuestionInput { question(string), focus_node_id?, target_node_id?, max_depth? }
+  Response 200: QuestionAnswer { question, intent, answer, matched_entities, evidence: { paths, cypher template + params } }
+  Intents recognized: summary, dependencies, dependents, shortest_path, root_causes, blast_radius, data_access
+
+GET /v1/graphs/{graphId}/nodes
+  Request query: search?, kind?(NodeKind), limit?(<=1000)
+  Response 200: { items: ArchitectureNode[] }
+
+GET /v1/graphs/{graphId}/nodes/{nodeId}
+  Response 200: ArchitectureNode
+
+GET /v1/graphs/{graphId}/nodes/{nodeId}/dependencies
+  Request query: max_depth?(<=15), limit?(<=200)
+  Response 200: ExecutedGraphQuery { paths, cypher, parameters } (bounded outgoing dependency paths)
+
+GET /v1/graphs/{graphId}/nodes/{nodeId}/dependents
+  Request query: max_depth?, limit?
+  Response 200: ExecutedGraphQuery (bounded incoming dependency paths)
+
+GET /v1/graphs/{graphId}/paths
+  Request query: from(PortableId, required), to(PortableId, required), max_depth?
+  Response 200: ExecutedGraphQuery (shortest path between two nodes)
+
+Error format: application/problem+json (implied, consistent with other services)
+Common error responses: 401 Unauthorized, 404 NotFound, 422 ValidationError
+
+
+==================================================================
+NOTES
+==================================================================
+- All three services use RFC 7807 "problem+json" for error bodies.
+- postgres-project-tenancy and the two data-plane APIs (clickhouse-telemetry-api,
+  architecture-graph-api) share projectId/serviceId as the join keys across services.
+- clickhouse-telemetry-api and architecture-graph-api are internal-only (static
+  bearer tokens); postgres-project-tenancy is the only service meant to face
+  end users directly (OIDC-authenticated), and should authorize + proxy calls
+  to the other two.
