@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "description": "My webpack project",
-  "name": "@insight-track/charts-fe",
+  "name": "@insight-track/cx-h-fe",
   "scripts": {
     "build": "webpack --mode=production --node-env=production",
     "build:dev": "webpack --mode=development",
