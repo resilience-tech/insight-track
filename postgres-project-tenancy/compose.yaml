@@ -29,6 +29,7 @@ services:
       KC_HOSTNAME: http://localhost:8081
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      FRONTEND_URL: http://localhost:5173
     ports:
       - "8081:8080"
     volumes:

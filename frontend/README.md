@@ -8,5 +8,10 @@ React + TypeScript + Tailwind CSS dashboard UI for Insight Track, consuming
 
 ```sh
 npm install
-npm run dev
+VITE_KEYCLOAK_URL=http://localhost:8081 npm run dev
 ```
+
+The app uses the `insight-track-frontend` Keycloak client with Authorization
+Code and PKCE. In the combined Compose deployment it automatically uses
+`https://<APP_DOMAIN>/auth`; no frontend rebuild is required when the domain
+changes.
