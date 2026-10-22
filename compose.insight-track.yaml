@@ -20,6 +20,8 @@ services:
         condition: service_started
       telemetry-api:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     networks:
       - edge
     restart: unless-stopped
@@ -176,6 +178,26 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - edge
+      - telemetry-data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.149.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      OTEL_INGEST_TOKEN: ${OTEL_INGEST_TOKEN:?Set OTEL_INGEST_TOKEN in .env}
+      OTEL_CORS_ALLOWED_ORIGIN: ${OTEL_CORS_ALLOWED_ORIGIN:-https://*.blendologyapps.co.uk}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+    volumes:
+      - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    expose:
+      - "4318"
+      - "13133"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
     networks:
       - edge
       - telemetry-data
