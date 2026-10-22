@@ -1,8 +1,8 @@
 {
   "realm": "project-tenancy",
   "enabled": true,
-  "displayName": "Project Tenancy (local)",
-  "sslRequired": "none",
+  "displayName": "Insight Track",
+  "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -28,6 +28,40 @@
       "webOrigins": [
         "http://localhost:*"
       ],
+      "protocolMappers": [
+        {
+          "name": "project-tenancy-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "project-tenancy-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "insight-track-frontend",
+      "name": "Insight Track Frontend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "rootUrl": "${FRONTEND_URL}",
+      "baseUrl": "/",
+      "redirectUris": [
+        "/*"
+      ],
+      "webOrigins": [
+        "${FRONTEND_URL}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
       "protocolMappers": [
         {
           "name": "project-tenancy-api-audience",

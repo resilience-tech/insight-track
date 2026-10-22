@@ -1,0 +1,78 @@
+extensions:
+  bearertokenauth/ingest:
+    # The HyperDX browser SDK sends its ingestion key as the raw Authorization
+    # header value. Also accept the standard Bearer form for OTLP clients.
+    scheme: ""
+    tokens:
+      - ${env:OTEL_INGEST_TOKEN}
+      - Bearer ${env:OTEL_INGEST_TOKEN}
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        max_request_body_size: 2097152
+        auth:
+          authenticator: bearertokenauth/ingest
+        cors:
+          allowed_origins:
+            - ${env:OTEL_CORS_ALLOWED_ORIGIN}
+          allowed_headers:
+            - Authorization
+            - Content-Type
+          max_age: 7200
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 96
+
+exporters:
+  clickhouse:
+    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    database: insight_track
+    username: insight_track
+    password: ${env:CLICKHOUSE_PASSWORD}
+    create_schema: true
+    async_insert: true
+    compress: lz4
+    ttl: 720h
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 1000
+      batch:
+        min_size: 100
+        max_size: 1000
+        flush_timeout: 5s
+
+service:
+  extensions:
+    - bearertokenauth/ingest
+    - health_check
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [clickhouse]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [clickhouse]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [clickhouse]

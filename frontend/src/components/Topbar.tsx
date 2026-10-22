@@ -1,6 +1,9 @@
-import { Bell, ChevronDown, RefreshCw, Search } from "lucide-react";
+import { Bell, ChevronDown, LogOut, RefreshCw, Search } from "lucide-react";
+import { useAuth } from "../auth/AuthProvider";
 
 export function Topbar() {
+  const { user, logout } = useAuth();
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6">
       <button
@@ -44,12 +47,21 @@ export function Topbar() {
         </button>
         <div className="flex items-center gap-2 pl-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
-            AC
+            {user.initials}
           </span>
           <div className="hidden text-left leading-tight md:block">
-            <p className="text-sm font-medium text-slate-900">Alex Chen</p>
-            <p className="text-xs text-slate-500">Operations</p>
+            <p className="text-sm font-medium text-slate-900">{user.name}</p>
+            {user.email && <p className="text-xs text-slate-500">{user.email}</p>}
           </div>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={() => void logout()}
+            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </header>

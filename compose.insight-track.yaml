@@ -1,0 +1,218 @@
+name: insight-track
+
+services:
+  haproxy:
+    image: haproxy:3.2-alpine
+    user: "${HAPROXY_UID:-1000}:${HAPROXY_GID:-1000}"
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - ./deploy/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /obs/cert/server3_latest.pem:/usr/local/etc/haproxy/certs/origin-insight.blendology.com.pem:ro
+      - /obs/cert/server3_latest_key.pem:/usr/local/etc/haproxy/certs/origin-insight.blendology.com.pem.key:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      tenancy-api:
+        condition: service_started
+      telemetry-api:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - edge
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/healthz | grep -q '^ok$'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - edge
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: project_tenancy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-project-tenancy/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./deploy/postgres/002_compose_role.sh:/docker-entrypoint-initdb.d/002_compose_role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d project_tenancy"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - tenancy-data
+    restart: unless-stopped
+
+  keycloak-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?Set KEYCLOAK_DATABASE_PASSWORD in .env}
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - keycloak-data
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: ["start", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?Set KEYCLOAK_DATABASE_PASSWORD in .env}
+      KC_HOSTNAME: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}/auth
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      FRONTEND_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}
+    volumes:
+      - ./postgres-project-tenancy/deploy/keycloak/realm.json:/opt/keycloak/data/import/project-tenancy-realm.json:ro
+    expose:
+      - "8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - edge
+      - keycloak-data
+    restart: unless-stopped
+
+  tenancy-api:
+    build:
+      context: ./postgres-project-tenancy
+    environment:
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://app_login:${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}@postgres:5432/project_tenancy?sslmode=disable
+      DATABASE_ROLE: app_runtime
+      AUTH_MODE: oidc
+      OIDC_ISSUER: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}/auth/realms/project-tenancy
+      OIDC_AUDIENCE: project-tenancy-api
+      OIDC_JWKS_URL: http://keycloak:8080/auth/realms/project-tenancy/protocol/openid-connect/certs
+      INVITATION_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env}/invitations/accept
+      INVITATION_DELIVERY: log
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - edge
+      - tenancy-data
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.30.9-alpine
+    environment:
+      CLICKHOUSE_DB: insight_track
+      CLICKHOUSE_USER: insight_track
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse-telemetry-api/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O -
+          --header "X-ClickHouse-User: insight_track"
+          --header "X-ClickHouse-Key: $${CLICKHOUSE_PASSWORD}"
+          "http://127.0.0.1:8123/?query=SELECT%201"
+          | grep -qx '1'
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks:
+      - telemetry-data
+    restart: unless-stopped
+
+  telemetry-api:
+    build:
+      context: ./clickhouse-telemetry-api
+    environment:
+      HTTP_ADDR: :8080
+      API_TOKEN: ${TELEMETRY_API_TOKEN:?Set TELEMETRY_API_TOKEN in .env}
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: insight_track
+      CLICKHOUSE_USERNAME: insight_track
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - "8080"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health/ready | grep -q '\"status\":\"ok\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - edge
+      - telemetry-data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.149.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      OTEL_INGEST_TOKEN: ${OTEL_INGEST_TOKEN:?Set OTEL_INGEST_TOKEN in .env}
+      OTEL_CORS_ALLOWED_ORIGIN: ${OTEL_CORS_ALLOWED_ORIGIN:-https://*.blendologyapps.co.uk}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+    volumes:
+      - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    expose:
+      - "4318"
+      - "13133"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - edge
+      - telemetry-data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  keycloak-postgres-data:
+  clickhouse-data:
+
+networks:
+  edge:
+  tenancy-data:
+    internal: true
+  keycloak-data:
+    internal: true
+  telemetry-data:
+    internal: true
